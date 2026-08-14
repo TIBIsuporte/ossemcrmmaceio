@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title> Relatório de OS para avaliar CRM</title>
+  <!-- Importando as bibliotecas jsPDF e AutoTable via CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+  <style>
+    body { font-family: "Segoe UI", Arial, sans-serif; margin: 20px; background: #f4f6f9; }
+    h2 { color: #333; margin-bottom: 15px; }
+    .filtros { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    .linha { display: flex; gap: 20px; margin-top: 10px; }
+    .linha label { flex: 1; font-weight: bold; }
+    input, select { padding: 8px; width: 100%; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    button { padding: 10px 15px; background: #0078d7; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+    button:hover { background: #005a9e; }
+    .btn-acao { margin-top: 10px; }
+    
+    .input-grupo { display: flex; gap: 10px; align-items: center; }
+    .btn-modal { background: #6c757d; white-space: nowrap; }
+    .btn-modal:hover { background: #5a6268; }
+
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+    .modal-content { background: #fff; padding: 20px; border-radius: 8px; width: 500px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+    .modal-header { font-weight: bold; font-size: 16px; margin-bottom: 12px; color: #0078d7; display: flex; justify-content: space-between; align-items: center; }
+    
+    .modal-busca-container { margin-bottom: 10px; display: flex; flex-direction: column; gap: 5px; }
+    .modal-busca-container label { font-size: 12px; font-weight: bold; color: #555; }
+
+    .modal-body { overflow-y: auto; max-height: 45vh; border: 1px solid #eee; padding: 10px; border-radius: 4px; margin-bottom: 15px; }
+    .modal-body label { display: flex; justify-content: space-between; align-items: center; padding: 6px 4px; cursor: pointer; font-weight: normal; border-bottom: 1px solid #f9f9f9; font-size: 13px; }
+    .modal-body label:hover { background: #f1f1f1; }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 10px; }
+    .btn-secundario { background: #6c757d; }
+    .btn-secundario:hover { background: #5a6268; }
+
+    table { border-collapse: collapse; margin-top: 10px; width: 100%; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    th { background: #0078d7; color: #fff; padding: 10px; text-align: left; }
+    td { padding: 9px 10px; border-bottom: 1px solid #eee; }
+    tr:nth-child(even) { background: #f9f9f9; }
+    tr:hover { background: #eef6ff; }
+    .erro { color: red; font-weight: bold; margin-top: 15px; }
+    h3 { margin-top: 25px; color: #0078d7; }
+    .tabela-filtros th { background: #e2e8f0; padding: 6px 8px; }
+    .tabela-filtros select, .tabela-filtros input { font-size: 12px; padding: 4px; }
+    
+    .botoes-exportacao { margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn-excel { background: #28a745; }
+    .btn-excel:hover { background: #218838; }
+    .btn-pdf { background: #dc3545; }
+    .btn-pdf:hover { background: #c82333; }
+    .btn-pdf-lote { background: #6f42c1; }
+    .btn-pdf-lote:hover { background: #5a32a3; }
+
+    .loading-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.8); z-index: 2000; justify-content: center; align-items: center; flex-direction: column; gap: 15px; }
+    .spinner { width: 50px; height: 50px; border: 5px solid #f3f3f3; border-top: 5px solid #0078d7; border-radius: 50%; animation: spin 1s linear infinite; }
+    .loading-text { font-weight: bold; color: #0078d7; font-size: 16px; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <h2> Relatório de OS para avaliar CRM</h2>
+
+  <div class="filtros">
+    <div class="linha">
+      <label style="flex: 1;">Lojas (IDs separados por vírgula):
+        <div class="input-grupo" style="margin-top: 5px;">
+          <input type="text" id="lojas" placeholder="Ex: 2,3,4 ou selecione no botão">
+          <button type="button" class="btn-modal" onclick="abrirModalLojas()">Selecionar Lojas</button>
+        </div>
+      </label>
+    </div>
+    <div class="linha">
+      <label>Data Inicial:
+        <input type="date" id="dataInicial">
+      </label>
+      <label>Data Final:
+        <input type="date" id="dataFinal">
+      </label>
+    </div>
+    <div class="linha">
+      <label>Tipo de Data:
+        <select id="tipodata">
+          <option value="VENDA" selected>VENDA</option>
+          <option value="PAGAMENTO">PAGAMENTO</option>
+          <option value="ENTREGA">ENTREGA</option>
+        </select>
+      </label>
+    </div>
+    <button class="btn-acao" onclick="consultar()">Consultar</button>
+  </div>
+
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="spinner"></div>
+    <div class="loading-text">Gerando relatório, por favor aguarde...</div>
+  </div>
+
+  <div id="resultado"></div>
+
+  <!-- Modal Lojas -->
+  <div id="modalLojas" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span>Selecionar Lojas</span>
+      </div>
+      
+      <div class="modal-busca-container">
+        <label>Filtrar por Nome do Gerente:</label>
+        <input type="text" id="inputFiltroGerenteModal" placeholder="Digite o nome do gerente (ex: Daniel)..." onkeyup="filtrarLojasNoModal()">
+      </div>
+
+      <div style="margin-bottom: 8px;">
+        <label style="font-size: 13px; cursor: pointer; font-weight: bold; display: flex; justify-content: flex-start; gap: 8px;">
+          <input type="checkbox" id="selecionarTodasLojas" onclick="toggleSelecionarTodasLojas(this)" style="width: auto;"> Selecionar / Desmarcar Lojas Visíveis
+        </label>
+      </div>
+
+      <div class="modal-body" id="listaLojasModal"></div>
+      
+      <div class="modal-footer">
+        <button type="button" class="btn-secundario" onclick="fecharModalLojas()">Cancelar</button>
+        <button type="button" onclick="confirmarSelecaoLojas()">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let dadosGlobais = [];
+    let registrosGlobaisValidos = [];
+
+    const lojasDisponiveis = [
+      { id: "1", nome: "0001 - OTICA LENS - ZACA 1", gerente: "JAQUELINE" },
+      { id: "2", nome: "0002 - OTICA LENS - EMILIANO", gerente: "ANA PAULA" },
+      { id: "3", nome: "0003 - OTICA LENS - AGUA VERDE", gerente: "MARCELL" },
+      { id: "4", nome: "0004 - OTICA LENS - PALLADIUM", gerente: "JULIANA" },
+      { id: "5", nome: "0005 - OTICA LENS - BARIGUI", gerente: "FERNANDA" },
+      { id: "6", nome: "0006 - OTICA LENS - JARDIM", gerente: "DARIANE" },
+      { id: "7", nome: "0007 - OTICA LENS - SAO JOSE", gerente: "THIAGO" },
+      { id: "8", nome: "0008 - OTICA LENS - ZACA 2", gerente: "JAQUELINE" },
+      { id: "9", nome: "0009 - OTICA LENS JOCKEY", gerente: "-" },
+      { id: "10", nome: "0010 - OTICA LENS - SHOP CURITIBA", gerente: "DELAINE" },
+      { id: "11", nome: "0011 - OTICA LENS - PATIO BATEL", gerente: "DANIEL" },
+      { id: "12", nome: "0012 - OTICA LENS - ARAUCARIA", gerente: "HALINE" },
+      { id: "13", nome: "0013 - OTICA LENS - EYEMAX", gerente: "DANIEL" },
+      { id: "14", nome: "0014 - OTICA LENS - FAZENDA RIO GRANDE", gerente: "HALINE" },
+      { id: "15", nome: "0015 - OTICA LENS - JOCKEY", gerente: "MARCOS" },
+      { id: "16", nome: "0016 - OTICA LENS - SHOPPING MUELLER", gerente: "CIBELLE" },
+      { id: "17", nome: "0017 - OTICA LENS - STRESSER", gerente: "CIBELLE" },
+      { id: "18", nome: "0018 - OTICA LENS - COMENDADOR", gerente: "DELAINE" },
+      { id: "101", nome: "0101 - CURITIBA CENTRO OTICO - MURICY", gerente: "JAQUELINE" },
+      { id: "102", nome: "0102 - CURITIBA CENTRO OTICO - GETULIO", gerente: "DANIEL" },
+      { id: "103", nome: "0103 - CURITIBA CENTRO OTICO - EMILIANO", gerente: "ANA PAULA" },
+      { id: "104", nome: "0104 - CURITIBA CENTRO OTICO - JARDIM", gerente: "DARIANE" },
+      { id: "105", nome: "0105 - CURITIBA CENTRO OTICO - SETE DE SETEMBRO", gerente: "MARCELL" },
+      { id: "106", nome: "0106 - CURITIBA CENTRO OTICO - BARIGUI", gerente: "FERNANDA" },
+      { id: "107", nome: "0107 - CURITIBA CENTRO OTICO - PALLADIUM", gerente: "JULIANA" },
+      { id: "108", nome: "0108 - CURITIBA CENTRO OTICO - MUELLER", gerente: "CIBELLE" },
+      { id: "109", nome: "0109 - OTICAS VIA VISAO VENTURA", gerente: "HALINE" },
+      { id: "110", nome: "0110 - CURITIBA CENTRO OTICO - JOCKEY", gerente: "MARCOS" },
+      { id: "201", nome: "0201 - OTICAS VIA VISAO - JOINVILLE SADALLA", gerente: "ZILETAI" },
+      { id: "202", nome: "0202 - OTICAS VIA VISAO - JOINVILLE CENTRO", gerente: "LUCIMAR" },
+      { id: "203", nome: "0203 - OTICAS VIA VISAO - JOINVILLE AVENTUREIRO", gerente: "LUCIMAR" },
+      { id: "204", nome: "0204 - OTICAS VIA VISAO - JOINVILLE GARTEN", gerente: "LUCIMAR" },
+      { id: "205", nome: "0205 - OTICAS VIA VISAO - JOINVILLE COSTA SILVA", gerente: "LUCIMAR" },
+      { id: "206", nome: "0206 - OTICAS VIA VISAO - JARAGUA DO SUL", gerente: "ZILETAI" },
+      { id: "207", nome: "0207 - OTICAS VIA VISAO - ARAQUARI", gerente: "ZILETAI" },
+      { id: "251", nome: "0251 - OTICAS VIA VISAO - PONTA GROSSA", gerente: "CIBELLE" },
+      { id: "252", nome: "0252 - OTICAS VIA VISAO - PLAZA SHOPPING - PG", gerente: "DELAINE" },
+      { id: "301", nome: "0301 - OTICA BOA VISTA - ZACARIAS", gerente: "JAQUELINE" },
+      { id: "302", nome: "0302 - OTICAS VIA VISAO - BARIGUI", gerente: "FERNANDA" },
+      { id: "303", nome: "0303 - OTICAS VIA VISAO - JARDIM", gerente: "DARIANE" },
+      { id: "304", nome: "0304 - OTICAS VIA VISAO - PALLADIUM", gerente: "JULIANA" },
+      { id: "502", nome: "0502 - OTICAS VIA VISAO - RIO CLARO", gerente: "MARLI" },
+      { id: "503", nome: "0503 - OTICAS VIA VISAO - METROPOLITAN", gerente: "KIANDRA" },
+      { id: "504", nome: "0504 - OTICAS VIA VISAO - FAZENDA", gerente: "HALINE" },
+      { id: "506", nome: "0506 - OTICAS VIA VISAO - ITANHAEM", gerente: "JAQUELINE" },
+      { id: "507", nome: "0507 - OTICAS VIA VISAO - NORTE SHOPPING", gerente: "ANATALIA" },
+      { id: "508", nome: "0508 - OTICAS VIA VISAO FASHION OTICA - SANTOS", gerente: "ROSEMEIRE" },
+      { id: "510", nome: "0510 - OTICAS VIA VISAO - BARUERI", gerente: "LIVIA" },
+      { id: "511", nome: "0511 - ZVC - CABRAL MALL", gerente: "PATRICIA" },
+      { id: "512", nome: "0512 - OTICAS VIA VISAO - LONDRINA - CENTRO", gerente: "DANIEL" },
+      { id: "513", nome: "0513 - OTICAS VIA VISAO - BATEL", gerente: "DELAINE" },
+      { id: "514", nome: "0514 - OTICAS VIA VISAO - CABRAL MALL", gerente: "PATRICIA" },
+      { id: "515", nome: "0515 - OTICA PINHAIS", gerente: "RAQUEL" },
+      { id: "517", nome: "0517 - OTICAS VIA VISAO - SELETA", gerente: "ZILETAI" },
+      { id: "518", nome: "0518 - OTICA VISAO - PORTO CALVO", gerente: "DARLLAN" },
+      { id: "519", nome: "0519 - ZVC - MACEIO JATIUCA", gerente: "DARLLAN" },
+      { id: "520", nome: "0520 - OTICAS VIA VISAO - MACEIO - FAROL", gerente: "DARLLAN" },
+      { id: "521", nome: "0521 - OTICAS VIA VISAO - MACEIO - GRUTA", gerente: "DARLLAN" },
+      { id: "522", nome: "0522 - OTICAS VIA VISAO - MACEIO - SHOPPING", gerente: "DARLLAN" },
+      { id: "523", nome: "0523 - ZVC - SHOPPING MACEIO", gerente: "DARLLAN" },
+      { id: "524", nome: "0524 - OTICA PINHAIS", gerente: "RAQUEL" },
+      { id: "525", nome: "0525 - OTICAS VIA VISAO - COLOMBO", gerente: "THIAGO" },
+      { id: "526", nome: "0526 - OTICA PINHAIS MATRIZ", gerente: "RAQUEL" },
+      { id: "527", nome: "0527 - OTICA PINHAIS JACOB MACANHAN", gerente: "RAQUEL" },
+      { id: "528", nome: "0528 - OTICAS VIA VISAO - PAICANDU", gerente: "SUELI" },
+      { id: "529", nome: "0529 - CHROMA OTICA BLUMENAU - CENTRO", gerente: "LEANDRO" },
+      { id: "530", nome: "0530 - OTICAS VIA VISAO - EPITACIO", gerente: "-" },
+      { id: "531", nome: "0531 - OTICAS VIA VISAO - BACACHERI FAGUNDES", gerente: "PATRICIA" },
+      { id: "532", nome: "0532 - OTICAS VIA VISAO - IRAI", gerente: "MARCOS" },
+      { id: "533", nome: "0533 - OTICAS VIA VISAO - T BORBA - CENTRO", gerente: "ANA PAULA" },
+      { id: "534", nome: "0534 - OTICAS VIA VISAO - PETROPOLIS CENTRO", gerente: "INGRID" },
+      { id: "535", nome: "0535 - OTICAS VIA VISAO - PETROPOLIS ITAIPAVA", gerente: "INGRID" },
+      { id: "536", nome: "0536 - OTICAS VIA VISAO - BARRA SHOPPING", gerente: "ANATALIA" },
+      { id: "537", nome: "0537 - OTICAS VIA VISAO - RIBEIRAO PRETO", gerente: "JULIANA" },
+      { id: "538", nome: "0538 - OTICAS VIA VISAO - ARAPIRACA", gerente: "DARLLAN" },
+      { id: "539", nome: "0539 - OTICA ITALIANA - COLOMBO", gerente: "THIAGO" },
+      { id: "540", nome: "0540 - OTICAS VIA VISAO - AVARE", gerente: "MARCELL" },
+      { id: "541", nome: "0541 - OTICAS VIA VISAO - BLUMENAU", gerente: "JULIANA" },
+      { id: "542", nome: "0542 - ZVC - PETROPOLIS", gerente: "INGRID" },
+      { id: "543", nome: "0543 - OTICAS VIA VISAO - ITAJUBA", gerente: "JAQUELINE" },
+      { id: "544", nome: "0544 - OTICAS VIA VISAO - CAUCAIA", gerente: "CIBELLE" },
+      { id: "545", nome: "0545 - OTICAS VIA VISAO - ASSIS", gerente: "MARCELL" },
+      { id: "546", nome: "0546 - OTICAS VIA VISAO - ITUPAVA", gerente: "DANIEL" },
+      { id: "547", nome: "0547 - OTICAS VIA VISAO - BACACHERI ERASTO", gerente: "PATRICIA" },
+      { id: "548", nome: "0548 - OTICAS VIA VISAO - T BORBA - CHANCELLER", gerente: "ANA PAULA" },
+      { id: "549", nome: "0549 - OTICAS VIA VISAO - BISPO", gerente: "MARCELL" },
+      { id: "550", nome: "0550 - CURITIBA CENTRO OTICO - BAURU", gerente: "MARLI" },
+      { id: "551", nome: "0551 - OTICAS VIA VISAO - PRESIDENTE PRUDENTE", gerente: "SUELI" },
+      { id: "552", nome: "0552 - OTICAS VIA VISAO - NATAL", gerente: "CIBELLE" },
+      { id: "553", nome: "0553 - OTICAS VIA VISAO - MARILIA", gerente: "MARCELL" },
+      { id: "554", nome: "0554 - OTICAS VIA VISAO - SHOPPING CENTER POINT", gerente: "ANATALIA" },
+      { id: "555", nome: "0555 - OTICAS VIA VISAO - AMERICAS SHOPPING", gerente: "ANATALIA" },
+      { id: "556", nome: "0556 - OTICAS", gerente: "SUELI" },
+      { id: "557", nome: "0557 - OTICAS VIA VISAO - MACAPA", gerente: "SUELI" },
+      { id: "558", nome: "0558 - OTICAS VIA VISAO - COLORADO", gerente: "DANIEL" },
+      { id: "559", nome: "0559 - OTICAS VIA VISAO - SORRISO", gerente: "PATRICIA TAMBOSI" },
+      { id: "560", nome: "0560 - OTICAS VIA VISAO - DOURADOS", gerente: "SUELI" },
+      { id: "561", nome: "0561 - OTICAS POP VISION - FAROL", gerente: "DARLLAN" },
+      { id: "562", nome: "0562 - OTICAS VIA VISAO - SINOP", gerente: "PATRICIA TAMBOSI" },
+      { id: "563", nome: "0563 - OTICAS VIA VISAO - CIANORTE", gerente: "SUELI" },
+      { id: "564", nome: "0564 - OTICAS VIA VISAO - MACAPA - TREM", gerente: "SUELI" },
+      { id: "565", nome: "0565 - ZVC - PETROPOLIS II", gerente: "INGRID" },
+      { id: "566", nome: "0566 - OTICAS VIA VISAO - ALPHAVILLE", gerente: "LIVIA" },
+      { id: "567", nome: "0567 - OTICAS VIA VISAO - EMILIANO", gerente: "ANA PAULA" },
+      { id: "568", nome: "0568 - OTICAS VIA VISAO - MAL CANDIDO RONDON", gerente: "SUELI" },
+      { id: "569", nome: "0569 - OTICAS VIA VISAO - SAO JOSE", gerente: "THIAGO" },
+      { id: "701", nome: "0701 - BUSQUE VISAO - JOINVILLE CENTRO", gerente: "LUCIMAR" },
+      { id: "702", nome: "0702 - BUSQUE VISAO - JOINVILLE AVENTUREIRO", gerente: "LUCIMAR" },
+      { id: "901", nome: "0901 - OTICAS CAROL - SHOPPING CURITIBA", gerente: "DELAINE" },
+      { id: "902", nome: "0902 - OTICAS CAROL - JOCKEY", gerente: "MARCOS" },
+      { id: "903", nome: "0903 - OTICAS CAROL - PALLADIUM", gerente: "JULIANA" },
+      { id: "904", nome: "0904 - OTICAS CAROL - PALLADIUM PONTA GROSSA", gerente: "CIBELLE" },
+      { id: "905", nome: "0905 - OTICAS CAROL - SAO JOSE", gerente: "THIAGO" },
+      { id: "906", nome: "0906 - OTICAS CAROL - JARDIM", gerente: "DARIANE" },
+      { id: "907", nome: "0907 - OTICAS CAROL - PLAZA SHOPPING - PG", gerente: "DELAINE" }
+    ];
+
+    function obterGerentePorLoja(nomeLoja) {
+      if (!nomeLoja) return "-";
+      const lojaEncontrada = lojasDisponiveis.find(l => l.nome.toUpperCase() === nomeLoja.trim().toUpperCase());
+      return lojaEncontrada ? lojaEncontrada.gerente : "-";
+    }
+
+    function abrirModalLojas() {
+      document.getElementById("inputFiltroGerenteModal").value = "";
+      renderizarListaLojasModal(lojasDisponiveis);
+      document.getElementById("modalLojas").style.display = "flex";
+    }
+
+    function renderizarListaLojasModal(lista) {
+      const container = document.getElementById("listaLojasModal");
+      container.innerHTML = "";
+      const idsAtuais = document.getElementById("lojas").value.split(",").map(s => s.trim());
+
+      lista.forEach(loja => {
+        const checked = idsAtuais.includes(loja.id) ? "checked" : "";
+        container.innerHTML += `
+          <label class="item-loja-modal" data-gerente="${(loja.gerente || "").toUpperCase()}">
+            <div>
+              <input type="checkbox" value="${loja.id}" ${checked} style="width: auto; margin-right: 8px;"> 
+              <strong>[${loja.id}]</strong> ${loja.nome}
+            </div>
+            <span style="color: #666; font-size: 11px;">Gerente: ${loja.gerente}</span>
+          </label>
+        `;
+      });
+    }
+
+    function filtrarLojasNoModal() {
+      const termo = document.getElementById("inputFiltroGerenteModal").value.trim().toUpperCase();
+      const labels = document.querySelectorAll("#listaLojasModal .item-loja-modal");
+
+      labels.forEach(label => {
+        const gerente = label.getAttribute("data-gerente");
+        if (gerente.includes(termo) || termo === "") {
+          label.style.display = "flex";
+        } else {
+          label.style.display = "none";
+        }
+      });
+    }
+
+    function fecharModalLojas() {
+      document.getElementById("modalLojas").style.display = "none";
+    }
+
+    function toggleSelecionarTodasLojas(master) {
+      const labels = document.querySelectorAll("#listaLojasModal .item-loja-modal");
+      labels.forEach(label => {
+        if (label.style.display !== "none") {
+          const cb = label.querySelector("input[type='checkbox']");
+          if (cb) cb.checked = master.checked;
+        }
+      });
+    }
+
+    function confirmarSelecaoLojas() {
+      const idsAtuaisSet = new Set(document.getElementById("lojas").value.split(",").map(s => s.trim()).filter(Boolean));
+      
+      const labels = document.querySelectorAll("#listaLojasModal .item-loja-modal");
+      labels.forEach(label => {
+        const cb = label.querySelector("input[type='checkbox']");
+        if (cb) {
+          if (cb.checked) {
+            idsAtuaisSet.add(cb.value);
+          } else {
+            if (label.style.display !== "none") {
+              idsAtuaisSet.delete(cb.value);
+            }
+          }
+        }
+      });
+
+      document.getElementById("lojas").value = Array.from(idsAtuaisSet).join(",");
+      fecharModalLojas();
+    }
+
+    function formatarDataISOparaBR(dataISO) {
+      if (!dataISO) return "";
+      const partes = dataISO.split("-");
+      return `${partes[2]}/${partes[1]}/${partes[0]}`;
+    }
+
+    async function consultar() {
+      document.getElementById("loadingOverlay").style.display = "flex";
+
+      const body = {
+        DATAINICIAL: formatarDataISOparaBR(document.getElementById("dataInicial").value),
+        DATAFINAL: formatarDataISOparaBR(document.getElementById("dataFinal").value),
+        LOJAS: document.getElementById("lojas").value,
+        TIPODATA: document.getElementById("tipodata").value || "VENDA",
+        TIPOVENDA: ""
+      };
+
+      try {
+        // CORREÇÃO: URL relativa para funcionar no Render
+        const response = await fetch("/consulta", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+
+        if (!response.ok) throw new Error("Erro na requisição: " + response.status);
+
+        dadosGlobais = await response.json();
+        processarEExibir(dadosGlobais);
+      } catch (error) {
+        document.getElementById("resultado").innerHTML = "<p class='erro'>" + error.message + "</p>";
+      } finally {
+        document.getElementById("loadingOverlay").style.display = "none";
+      }
+    }
+
+    function processarEExibir(data) {
+      if (!data || data.length === 0) {
+        document.getElementById("resultado").innerHTML = "<p>Nenhum resultado encontrado.</p>";
+        return;
+      }
+
+      const excluirLinhas = [
+        "AIR OPTIX HYDRAGLYDE MULTIFOCAL",
+        "ARMACAO RX",
+        "ARMACAO SUN", 
+        "OUTROS", 
+        "OASYS", 
+        "ACUVUE 2",
+        "OASYS 1 DAY",
+        "OASYS ASTIGMATISMO",
+        "AIR OPTIX HYDRAGLYDE ASTIGMATISMO",
+        "AIR OPTIX HYDRAGLYDE MULTIFOCAL",
+        "OASYS 1 DAY ASTIGMATISMO",
+        "AIR OPTIX AQUA HYDRAGLYDE", 
+        "SERVICOS", 
+        "ARMACAO CLIPON", 
+        "TRATAMENTOS",
+        "RELOGIO",
+        "SEMI JOIA",
+        "CORRENTE"
+      ];
+
+      const lojasResumo = {};
+      registrosGlobaisValidos = [];
+
+      data.forEach(item => {
+        const linhaProduto = (item.LINHADEPRODUTO || "").trim().toUpperCase();
+        if (excluirLinhas.includes(linhaProduto)) return;
+
+        item.GERENTE = item.GERENTE || obterGerentePorLoja(item.LOJANOME);
+
+        if (item.MEDICO === "SEM MEDICO" || item.MEDICO === "COPIA SISTEMA") {
+          const nomeLoja = item.LOJANOME || "Outras Lojas";
+          if (!lojasResumo[nomeLoja]) {
+            lojasResumo[nomeLoja] = { semMedico: 0, copiaSistema: 0 };
+          }
+          if (item.MEDICO === "SEM MEDICO") lojasResumo[nomeLoja].semMedico++;
+          if (item.MEDICO === "COPIA SISTEMA") lojasResumo[nomeLoja].copiaSistema++;
+
+          registrosGlobaisValidos.push(item);
+        }
+      });
+
+      if (registrosGlobaisValidos.length === 0) {
+        document.getElementById("resultado").innerHTML = "<p>Nenhum registro válido encontrado.</p>";
+        return;
+      }
+
+      registrosGlobaisValidos.sort((a, b) => (a.LOJANOME || "").localeCompare(b.LOJANOME || ""));
+      const lojasOrdenadas = Object.keys(lojasResumo).sort();
+
+      let html = "<h3>Resumo por Loja</h3>";
+      html += "<table><thead><tr><th>Loja</th><th>SEM MEDICO</th><th>COPIA SISTEMA</th></tr></thead><tbody>";
+      lojasOrdenadas.forEach(loja => {
+        const total = lojasResumo[loja];
+        html += `<tr><td>${loja}</td><td>${total.semMedico}</td><td>${total.copiaSistema}</td></tr>`;
+      });
+      html += "</tbody></table>";
+
+      html += "<h3>Detalhes Gerais por OS</h3>";
+      html += `<div class="botoes-exportacao">
+                 <button type="button" class="btn-excel" onclick="exportarExcel()">Exportar para Excel</button>
+                 <button type="button" class="btn-pdf" onclick="exportarPDF()">Exportar para PDF</button>
+                 <button type="button" class="btn-pdf-lote" onclick="exportarPDFsPorGerencia()">Exportar Lojas da Gerência (PDFs Individuais)</button>
+               </div>`;
+
+      html += '<table id="tabelaDetalhes"><thead>';
+      html += "<tr>" +
+        "<th>Gerente</th><th>Loja</th><th>Nº OS</th><th>Tipo de Venda</th><th>Produto</th><th>Médico</th><th>Linha de Produto</th>" +
+        "</tr>";
+      
+      html += "<tr class='tabela-filtros'>" +
+        `<th><select id="filtroGerente" onchange="aoMudarGerente()"><option value="">Todos</option></select></th>` +
+        `<th><select id="filtroLoja" onchange="filtrarTabela()"><option value="">Todas</option></select></th>` +
+        `<th><input type="text" id="filtroOS" onkeyup="filtrarTabela()" placeholder="Filtrar..."></th>` +
+        `<th><select id="filtroTipoVenda" onchange="filtrarTabela()"><option value="">Todos</option></select></th>` +
+        `<th><input type="text" id="filtroProduto" onkeyup="filtrarTabela()" placeholder="Filtrar..."></th>` +
+        `<th><select id="filtroMedico" onchange="filtrarTabela()"><option value="">Todos</option></select></th>` +
+        `<th><select id="filtroLinha" onchange="filtrarTabela()"><option value="">Todas</option></select></th>` +
+        "</tr>";
+
+      html += "</thead><tbody id='corpoTabelaDetalhes'>";
+
+      registrosGlobaisValidos.forEach(item => {
+        const gerenteLoja = item.GERENTE || obterGerentePorLoja(item.LOJANOME);
+        html += "<tr data-loja='" + (item.LOJANOME || "") + "' " +
+                "data-gerente='" + gerenteLoja + "' " +
+                "data-os='" + (item.CODIGODAVENDA || "") + "' " +
+                "data-tipovenda='" + (item.TIPOVENDA || "") + "' " +
+                "data-produto='" + (item.DESCRICAOPRODUTO || "") + "' " +
+                "data-medico='" + (item.MEDICO || "") + "' " +
+                "data-linha='" + (item.LINHADEPRODUTO || "") + "'>" +
+          `<td>${gerenteLoja}</td>` +
+          `<td>${item.LOJANOME || ""}</td>` +
+          `<td>${item.CODIGODAVENDA || ""}</td>` +
+          `<td>${item.TIPOVENDA || ""}</td>` +
+          `<td>${item.DESCRICAOPRODUTO || ""}</td>` +
+          `<td>${item.MEDICO || ""}</td>` +
+          `<td>${item.LINHADEPRODUTO || ""}</td>` +
+          "</tr>";
+      });
+
+      html += "</tbody></table>";
+      document.getElementById("resultado").innerHTML = html;
+
+      popularFiltrosIniciais(registrosGlobaisValidos);
+    }
+
+    function popularFiltrosIniciais(registros) {
+      const gerentes = [...new Set(registros.map(i => i.GERENTE || obterGerentePorLoja(i.LOJANOME)))].sort();
+      const tiposVenda = [...new Set(registros.map(i => i.TIPOVENDA))].sort();
+      const medicos = [...new Set(registros.map(i => i.MEDICO))].sort();
+      const linhas = [...new Set(registros.map(i => i.LINHADEPRODUTO))].sort();
+
+      preencherSelect("filtroGerente", gerentes);
+      preencherSelect("filtroTipoVenda", tiposVenda);
+      preencherSelect("filtroMedico", medicos);
+      preencherSelect("filtroLinha", linhas);
+
+      atualizarSelectLojasPorGerente(registros);
+    }
+
+    function atualizarSelectLojasPorGerente(registros) {
+      const fGerente = document.getElementById("filtroGerente").value.toLowerCase();
+      
+      const registrosFiltrados = fGerente 
+        ? registros.filter(i => (i.GERENTE || obterGerentePorLoja(i.LOJANOME)).toLowerCase() === fGerente)
+        : registros;
+
+      const lojas = [...new Set(registrosFiltrados.map(i => i.LOJANOME))].sort();
+      
+      const selectLoja = document.getElementById("filtroLoja");
+      const valorAtual = selectLoja.value;
+      
+      selectLoja.innerHTML = '<option value="">Todas</option>';
+      lojas.forEach(val => {
+        const opt = document.createElement("option");
+        opt.value = val;
+        opt.textContent = val;
+        selectLoja.appendChild(opt);
+      });
+
+      if (lojas.includes(valorAtual)) {
+        selectLoja.value = valorAtual;
+      } else {
+        selectLoja.value = "";
+      }
+    }
+
+    function aoMudarGerente() {
+      atualizarSelectLojasPorGerente(registrosGlobaisValidos);
+      filtrarTabela();
+    }
+
+    function preencherSelect(id, valores) {
+      const select = document.getElementById(id);
+      valores.forEach(val => {
+        const opt = document.createElement("option");
+        opt.value = val;
+        opt.textContent = val;
+        select.appendChild(opt);
+      });
+    }
+
+    function filtrarTabela() {
+      const fLoja = document.getElementById("filtroLoja").value.toLowerCase();
+      const fGerente = document.getElementById("filtroGerente").value.toLowerCase();
+      const fOS = document.getElementById("filtroOS").value.toLowerCase();
+      const fTipoVenda = document.getElementById("filtroTipoVenda").value.toLowerCase();
+      const fProduto = document.getElementById("filtroProduto").value.toLowerCase();
+      const fMedico = document.getElementById("filtroMedico").value.toLowerCase();
+      const fLinha = document.getElementById("filtroLinha").value.toLowerCase();
+
+      const linhas = document.getElementById("corpoTabelaDetalhes").getElementsByTagName("tr");
+
+      for (let linha of linhas) {
+        const lLoja = linha.getAttribute("data-loja").toLowerCase();
+        const lGerente = linha.getAttribute("data-gerente").toLowerCase();
+        const lOS = linha.getAttribute("data-os").toLowerCase();
+        const lTipoVenda = linha.getAttribute("data-tipovenda").toLowerCase();
+        const lProduto = linha.getAttribute("data-produto").toLowerCase();
+        const lMedico = linha.getAttribute("data-medico").toLowerCase();
+        const lLinha = linha.getAttribute("data-linha").toLowerCase();
+
+        const match = 
+          (!fLoja || lLoja.includes(fLoja)) &&
+          (!fGerente || lGerente.includes(fGerente)) &&
+          (!fOS || lOS.includes(fOS)) &&
+          (!fTipoVenda || lTipoVenda.includes(fTipoVenda)) &&
+          (!fProduto || lProduto.includes(fProduto)) &&
+          (!fMedico || lMedico.includes(fMedico)) &&
+          (!fLinha || lLinha.includes(fLinha));
+
+        linha.style.display = match ? "" : "none";
+      }
+    }
+
+    function exportarExcel() {
+      const tabela = document.getElementById("tabelaDetalhes");
+      const linhas = Array.from(tabela.querySelectorAll("tbody tr")).filter(tr => tr.style.display !== "none");
+      
+      let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+      const cabecalhos = ["Gerente", "Loja", "Nº OS", "Tipo de Venda", "Produto", "Médico", "Linha de Produto"];
+      csvContent += cabecalhos.join(";") + "\n";
+
+      linhas.forEach(tr => {
+        const celulas = Array.from(tr.querySelectorAll("td")).map(td => `"${td.innerText.replace(/"/g, '""')}"`);
+        csvContent += celulas.join(";") + "\n";
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "relatorio_detalhes.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function exportarPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF('l', 'mm', 'a4');
+      
+      doc.setFontSize(14);
+      doc.text(" Relatório de OS para avaliar CRM (Detalhes)", 14, 15);
+
+      const colunas = ["Gerente", "Loja", "Nº OS", "Tipo de Venda", "Produto", "Médico", "Linha de Produto"];
+      const linhasTabela = [];
+      
+      const linhas = document.getElementById("corpoTabelaDetalhes").getElementsByTagName("tr");
+      for (let linha of linhas) {
+        if (linha.style.display !== "none") {
+          const cols = linha.getElementsByTagName("td");
+          linhasTabela.push([
+            cols[0].innerText,
+            cols[1].innerText,
+            cols[2].innerText,
+            cols[3].innerText,
+            cols[4].innerText,
+            cols[5].innerText,
+            cols[6].innerText
+          ]);
+        }
+      }
+
+      doc.autoTable({
+        head: [colunas],
+        body: linhasTabela,
+        startY: 22,
+        styles: { fontSize: 8 }
+      });
+
+      doc.save("relatorio_detalhes.pdf");
+    }
+
+    function exportarPDFsPorGerencia() {
+      const gerenteFiltro = document.getElementById("filtroGerente").value;
+      if (!gerenteFiltro) {
+        alert("Por favor, selecione uma Gerente no filtro da tabela antes de exportar os PDFs individuais por loja!");
+        return;
+      }
+
+      const linhas = document.getElementById("corpoTabelaDetalhes").getElementsByTagName("tr");
+      const lojasMap = {}; 
+
+      for (let linha of linhas) {
+        const lGerente = linha.getAttribute("data-gerente");
+        if (lGerente.toLowerCase() === gerenteFiltro.toLowerCase()) {
+          const lLoja = linha.getAttribute("data-loja");
+          if (!lojasMap[lLoja]) {
+            lojasMap[lLoja] = [];
+          }
+          const cols = linha.getElementsByTagName("td");
+          lojasMap[lLoja].push([
+            cols[0].innerText,
+            cols[1].innerText,
+            cols[2].innerText,
+            cols[3].innerText,
+            cols[4].innerText,
+            cols[5].innerText,
+            cols[6].innerText
+          ]);
+        }
+      }
+
+      const nomesLojas = Object.keys(lojasMap);
+      if (nomesLojas.length === 0) {
+        alert("Nenhuma loja encontrada para a gerente selecionada.");
+        return;
+      }
+
+      const { jsPDF } = window.jspdf;
+
+      nomesLojas.forEach((nomeLoja, index) => {
+        setTimeout(() => {
+          const doc = new jsPDF('l', 'mm', 'a4');
+          
+          doc.setFontSize(16);
+          doc.setTextColor(0, 120, 215);
+          doc.text(" Relatório de OS para avaliar CRM", 14, 15);
+          
+          doc.setFontSize(11);
+          doc.setTextColor(80, 80, 80);
+          doc.text(`Loja: ${nomeLoja} | Gerente: ${gerenteFiltro}`, 14, 23);
+
+          const colunas = ["Gerente", "Loja", "Nº OS", "Tipo de Venda", "Produto", "Médico", "Linha de Produto"];
+          
+          doc.autoTable({
+            head: [colunas],
+            body: lojasMap[nomeLoja],
+            startY: 28,
+            styles: { fontSize: 8 }
+          });
+
+          const nomeArquivoPDF = `${nomeLoja} ${gerenteFiltro}.pdf`.toLowerCase();
+          doc.save(nomeArquivoPDF);
+
+        }, index * 400);
+      });
+    }
+  </script>
+</body>
+</html>
