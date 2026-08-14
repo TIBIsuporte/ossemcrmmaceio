@@ -2,14 +2,27 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title> Relatório de OS para avaliar CRM</title>
+  <title>Relatório de OS para avaliar CRM</title>
   <!-- Importando as bibliotecas jsPDF e AutoTable via CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 
   <style>
     body { font-family: "Segoe UI", Arial, sans-serif; margin: 20px; background: #f4f6f9; }
-    h2 { color: #333; margin-bottom: 15px; }
+    
+    /* Cabeçalho Flexível - O "AGA" ficará à direita e o título à esquerda */
+    .header-titulo {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #ccc;
+    }
+    
+    h2 { color: #333; margin: 0; }
+    .titulo-aga { font-style: italic; color: #333; font-size: 1.2em; font-weight: bold; }
+
     .filtros { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
     .linha { display: flex; gap: 20px; margin-top: 10px; }
     .linha label { flex: 1; font-weight: bold; }
@@ -61,7 +74,12 @@
   </style>
 </head>
 <body>
-  <h2> Relatório de OS para avaliar CRM</h2>
+
+  <!-- Estrutura corrigida -->
+  <div class="header-titulo">
+    <h2>Relatório de OS para avaliar CRM</h2>
+    <span class="titulo-aga">AGA</span>
+  </div>
 
   <div class="filtros">
     <div class="linha">
@@ -105,27 +123,22 @@
       <div class="modal-header">
         <span>Selecionar Lojas</span>
       </div>
-      
       <div class="modal-busca-container">
         <label>Filtrar por Nome do Gerente:</label>
         <input type="text" id="inputFiltroGerenteModal" placeholder="Digite o nome do gerente (ex: Daniel)..." onkeyup="filtrarLojasNoModal()">
       </div>
-
       <div style="margin-bottom: 8px;">
         <label style="font-size: 13px; cursor: pointer; font-weight: bold; display: flex; justify-content: flex-start; gap: 8px;">
           <input type="checkbox" id="selecionarTodasLojas" onclick="toggleSelecionarTodasLojas(this)" style="width: auto;"> Selecionar / Desmarcar Lojas Visíveis
         </label>
       </div>
-
       <div class="modal-body" id="listaLojasModal"></div>
-      
       <div class="modal-footer">
         <button type="button" class="btn-secundario" onclick="fecharModalLojas()">Cancelar</button>
         <button type="button" onclick="confirmarSelecaoLojas()">Confirmar</button>
       </div>
     </div>
   </div>
-
   <script>
     let dadosGlobais = [];
     let registrosGlobaisValidos = [];
